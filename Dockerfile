@@ -6,14 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN groupadd --system app && useradd --system --gid app app
+RUN groupadd --system app && useradd --system --gid app --home-dir /home/app app
 
 COPY pyproject.toml README.md ./
 COPY . /app
 
-RUN pip install --upgrade pip && pip install -e .
-
-RUN chown -R app:app /app
+RUN pip install --upgrade pip && pip install -e . && mkdir -p /home/app && chown -R app:app /home/app /app
 USER app
 
 EXPOSE 8000
