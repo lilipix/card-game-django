@@ -2,11 +2,11 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .game_engine import create_game, join_game, start_game
+from .game_engine import create_game, join_game, play_card, start_game
 from .models import Game, GamePlayer
 
 
@@ -126,4 +126,42 @@ def game_join(
     return redirect(
         "game:game_detail",
         game_id=started_game.pk,
+    )
+
+
+@login_required
+@require_POST
+def play_card_view(request, game_id):
+    """Permet au joueur connecté de jouer sa prochaine carte."""
+
+    game = get_object_or_404(Game, pk=game_id)
+
+    player = get_object_or_404(
+        GamePlayer,
+        game=game,
+        user=request.user,
+    )
+
+    try:
+        card = play_card(game, player)
+    except ValueError as error:
+        return JsonResponse(
+            {"error": str(error)},
+            status=400,
+        )
+
+    game.refresh_from_db()
+
+    return JsonResponse(
+        {
+            "card": {
+                "id": card.pk,
+                "rank": card.get_rank_display(),  # type: ignore[reportAttributeAccessIssue]
+                "suit": card.get_suit_display(),  # type: ignore[reportAttributeAccessIssue]
+            },
+            "game": {
+                "status": game.status,
+                "current_round": game.current_round,
+            },
+        }
     )
