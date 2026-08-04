@@ -1,16 +1,18 @@
 [project]
 name = "card-game-django"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Django card game platform with Docker and CI support"
 readme = "README.md"
 authors = [
     { name = "Aurélie", email = "aurelie.demure.ad@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "django>=6.0.7",
     "django-environ>=0.14.0",
     "psycopg[binary]>=3.3.4",
+    "gunicorn>=23.0.0",
+    "ruff>=0.6.0",
 ]
 
 [project.scripts]
