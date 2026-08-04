@@ -68,13 +68,15 @@ def game_detail(
         game=game,
         user=request.user,
     ).exists():
-        return HttpResponseForbidden(
-            "Vous ne participez pas à cette partie."
-        )
+        return HttpResponseForbidden("Vous ne participez pas à cette partie.")
 
-    players = GamePlayer.objects.filter(
-        game=game,
-    ).select_related("user").order_by("position")
+    players = (
+        GamePlayer.objects.filter(
+            game=game,
+        )
+        .select_related("user")
+        .order_by("position")
+    )
 
     context = {
         "game": game,
