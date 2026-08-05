@@ -4,34 +4,41 @@ from django.db import models
 from django.db.models import F, Q
 
 
+class Profile(models.Model):
+    """Statistiques globales d'un utilisateur."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="game_profile",
+    )
+    games_played = models.PositiveIntegerField(default=0)
+    games_won = models.PositiveIntegerField(default=0)
+    total_score = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Profil jeu de {self.user}"
+
+
 class Game(models.Model):
-    """Représente une partie de Bataille simplifiée entre deux joueurs."""
+    """Partie de Bataille simplifiée entre deux joueurs."""
 
     class Status(models.TextChoices):
         WAITING = "WAITING", "En attente"
         IN_PROGRESS = "IN_PROGRESS", "En cours"
         FINISHED = "FINISHED", "Terminée"
 
-    # Etat global de la partie : attente des joueurs, partie en cours,
-    # puis partie terminée lorsque les 26 manches ont été résolues.
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.WAITING,
     )
-
-    # Progression de la partie. La Bataille simplifiée contient toujours
-    # 26 manches, car chaque joueur reçoit 26 cartes.
     current_round = models.PositiveSmallIntegerField(
         default=0,
-        validators=[
-            MinValueValidator(0),
-            MaxValueValidator(26),
-        ],
+        validators=[MinValueValidator(0), MaxValueValidator(26)],
     )
-
-    # Vainqueur final. Ce champ reste vide tant que la partie n'est pas finie
-    # et reste aussi vide si la partie se termine par un match nul.
     winner = models.ForeignKey(
         "GamePlayer",
         on_delete=models.SET_NULL,
@@ -39,89 +46,84 @@ class Game(models.Model):
         blank=True,
         related_name="games_won",
     )
-
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
+    # Marqueur interne: les statistiques globales ne doivent être ajoutées qu'une fois.
+    stats_recorded_at = models.DateTimeField(null=True, blank=True)
 
-    def __str__(self):
-        return f"Partie {self.pk} — {self.get_status_display()}"  # type: ignore[attr-defined]
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(current_round__gte=0) & Q(current_round__lte=26),
+                name="game_current_round_between_0_and_26",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Partie {self.pk} - {self.get_status_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class GamePlayer(models.Model):
-    """Associe un utilisateur Django à une partie et conserve son score."""
+    """Participation d'un utilisateur à une partie."""
 
     class Position(models.IntegerChoices):
         PLAYER_ONE = 1, "Joueur 1"
         PLAYER_TWO = 2, "Joueur 2"
 
-    # Une partie possède deux participants : joueur 1 et joueur 2.
     game = models.ForeignKey(
         Game,
         on_delete=models.CASCADE,
         related_name="players",
     )
-
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="game_participations",
     )
-
-    position = models.PositiveSmallIntegerField(
-        choices=Position.choices,
-    )
-
-    # Nombre de manches remportées. Une victoire vaut 1 point ;
-    # une défaite ou une égalité ne rapporte aucun point.
+    position = models.PositiveSmallIntegerField(choices=Position.choices)
     score = models.PositiveSmallIntegerField(
         default=0,
-        validators=[
-            MinValueValidator(0),
-            MaxValueValidator(26),
-        ],
+        validators=[MinValueValidator(0), MaxValueValidator(26)],
     )
-
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["position"]
-
         constraints = [
-            # Le même utilisateur ne peut pas rejoindre deux fois la même partie.
             models.UniqueConstraint(
                 fields=["game", "user"],
                 name="unique_user_per_game",
             ),
-            # Chaque position de joueur est unique dans une partie.
             models.UniqueConstraint(
                 fields=["game", "position"],
                 name="unique_player_position_per_game",
             ),
+            models.CheckConstraint(
+                condition=Q(position__in=[1, 2]),
+                name="game_player_position_is_1_or_2",
+            ),
+            models.CheckConstraint(
+                condition=Q(score__gte=0) & Q(score__lte=26),
+                name="game_player_score_between_0_and_26",
+            ),
         ]
 
-    def __str__(self):
-        return (
-            f"{self.user.username} — "
-            f"partie {self.game_id} — "  # type: ignore[attr-defined]
-            f"{self.get_position_display()}"  # type: ignore[attr-defined]
-        )
+    def __str__(self) -> str:
+        game_id = self.game_id  # pyright: ignore[reportAttributeAccessIssue]
+        return f"{self.user} - partie {game_id} - {self.get_position_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
-class GameCard(models.Model):
-    """Carte distribuée dans la pioche d'un joueur pour une partie donnée."""
+class Card(models.Model):
+    """Définition d'une carte standard."""
 
     class Suit(models.TextChoices):
-        # Les enseignes identifient les 52 cartes, mais elles n'ont aucune
-        # influence sur la puissance d'une carte.
-        HEARTS = "HEARTS", "Cœur"
+        HEARTS = "HEARTS", "Coeur"
         DIAMONDS = "DIAMONDS", "Carreau"
-        CLUBS = "CLUBS", "Trèfle"
+        CLUBS = "CLUBS", "Trefle"
         SPADES = "SPADES", "Pique"
 
     class Rank(models.IntegerChoices):
-        # Les valeurs numériques suivent l'ordre de puissance du jeu :
-        # 2 est la plus faible carte et 14 représente l'As.
         TWO = 2, "2"
         THREE = 3, "3"
         FOUR = 4, "4"
@@ -136,101 +138,138 @@ class GameCard(models.Model):
         KING = 13, "Roi"
         ACE = 14, "As"
 
-    game = models.ForeignKey(
+    suit = models.CharField(max_length=10, choices=Suit.choices)
+    rank = models.PositiveSmallIntegerField(choices=Rank.choices)
+
+    class Meta:
+        ordering = ["suit", "rank"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["suit", "rank"],
+                name="unique_standard_card",
+            ),
+        ]
+
+    @property
+    def power(self) -> int:
+        return self.rank
+
+    def __str__(self) -> str:
+        return f"{self.get_rank_display()} de {self.get_suit_display()}"  # pyright: ignore[reportAttributeAccessIssue]
+
+
+class Deck(models.Model):
+    """Paquet physique associé à une partie."""
+
+    game = models.OneToOneField(
         Game,
+        on_delete=models.CASCADE,
+        related_name="deck",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    shuffled_at = models.DateTimeField(null=True, blank=True)
+
+    def shuffle(self) -> list[Card]:
+        """Retourne les 52 cartes standard mélangées côté serveur."""
+
+        from random import shuffle
+
+        cards = list(Card.objects.all())
+        shuffle(cards)
+        return cards
+
+    def draw(self, owner: GamePlayer):
+        """Pioche la première carte non jouée du joueur dans l'ordre serveur."""
+
+        return (
+            # Le verrou empêche deux requêtes concurrentes de piocher la même carte.
+            self.cards.select_for_update()  # pyright: ignore[reportAttributeAccessIssue]
+            .filter(owner=owner, is_played=False)
+            .order_by("position")
+            .first()
+        )
+
+    def __str__(self) -> str:
+        game_id = self.game_id  # pyright: ignore[reportAttributeAccessIssue]
+        return f"Paquet de la partie {game_id}"
+
+
+class DeckCard(models.Model):
+    """Carte physique distribuée dans le paquet d'un joueur."""
+
+    # Contrairement à Card, DeckCard représente l'exemplaire attribué en partie.
+    deck = models.ForeignKey(
+        Deck,
         on_delete=models.CASCADE,
         related_name="cards",
     )
-
+    card = models.ForeignKey(
+        Card,
+        on_delete=models.PROTECT,
+        related_name="deck_cards",
+    )
     owner = models.ForeignKey(
         GamePlayer,
         on_delete=models.CASCADE,
-        related_name="cards",
+        related_name="deck_cards",
     )
-
-    suit = models.CharField(
-        max_length=10,
-        choices=Suit.choices,
-    )
-
-    rank = models.PositiveSmallIntegerField(
-        choices=Rank.choices,
-    )
-
-    # Position de la carte dans la pioche du joueur. Le serveur joue toujours
-    # la première carte non jouée, donc le joueur ne choisit pas sa carte.
     position = models.PositiveSmallIntegerField(
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(26),
-        ],
+        validators=[MinValueValidator(1), MaxValueValidator(26)],
     )
-
-    # Indique que la carte a déjà été jouée. Elle reste enregistrée
-    # pour conserver l'historique, mais ne peut plus être utilisée.
     is_played = models.BooleanField(default=False)
+    played_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["position"]
-
+        ordering = ["owner__position", "position"]
         constraints = [
-            # Une même partie ne peut contenir qu'un seul exemplaire
-            # de chaque combinaison enseigne + valeur.
             models.UniqueConstraint(
-                fields=["game", "suit", "rank"],
-                name="unique_card_per_game",
+                fields=["deck", "card"],
+                name="unique_physical_card_per_deck",
             ),
-            # La position fixe l'ordre de la pioche de chaque joueur.
             models.UniqueConstraint(
                 fields=["owner", "position"],
                 name="unique_position_per_player_deck",
             ),
+            models.CheckConstraint(
+                condition=Q(position__gte=1) & Q(position__lte=26),
+                name="deck_card_position_between_1_and_26",
+            ),
         ]
 
-    def __str__(self):
-        return (
-            f"{self.get_rank_display()} "  # type: ignore[attr-defined]
-            f"de {self.get_suit_display()}"  # type: ignore[attr-defined]
-        )
+    @property
+    def rank(self) -> int:
+        return self.card.rank
+
+    def __str__(self) -> str:
+        return f"{self.card} - {self.owner}"
 
 
 class Round(models.Model):
-    """Manche de jeu : chaque joueur révèle une carte, puis le serveur compare."""
+    """Manche: une carte par joueur, résolution après le second clic."""
 
     game = models.ForeignKey(
         Game,
         on_delete=models.CASCADE,
         related_name="rounds",
     )
-
     number = models.PositiveSmallIntegerField(
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(26),
-        ],
+        validators=[MinValueValidator(1), MaxValueValidator(26)],
     )
-
-    # Ces champs restent vide tant que le joueur concerné n'a pas
-    # retourné sa carte. La manche est complétée en deux actions.
     player_one_card = models.ForeignKey(
-        GameCard,
+        DeckCard,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="rounds_as_player_one_card",
     )
-
     player_two_card = models.ForeignKey(
-        GameCard,
+        DeckCard,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="rounds_as_player_two_card",
     )
-
-    # Null signifie soit que la manche n'est pas encore résolue,
-    # soit qu'elle s'est terminée par une égalité.
-    # is_resolved permet de distinguer les deux situations.
+    # Null signifie "pas encore résolue" ou "égalité"; is_resolved fait la différence.
     winner = models.ForeignKey(
         GamePlayer,
         on_delete=models.SET_NULL,
@@ -238,22 +277,21 @@ class Round(models.Model):
         blank=True,
         related_name="rounds_won",
     )
-
     is_resolved = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["number"]
-
         constraints = [
-            # Une manche ne peut être jouée qu'une seule fois dans une partie.
             models.UniqueConstraint(
                 fields=["game", "number"],
                 name="unique_round_number_per_game",
             ),
-            # Les deux joueurs ne peuvent pas révéler le même objet carte.
+            models.CheckConstraint(
+                condition=Q(number__gte=1) & Q(number__lte=26),
+                name="round_number_between_1_and_26",
+            ),
             models.CheckConstraint(
                 condition=(
                     Q(player_one_card__isnull=True)
@@ -266,8 +304,63 @@ class Round(models.Model):
 
     @property
     def is_draw(self) -> bool:
-        """Indique si la manche est résolue par une égalité."""
         return self.is_resolved and self.winner is None
 
+    def card_for(self, player: GamePlayer):
+        if player.position == GamePlayer.Position.PLAYER_ONE:
+            return self.player_one_card
+        return self.player_two_card
+
     def __str__(self) -> str:
-        return f"Manche {self.number} — partie {self.game_id}"  # type: ignore[attr-defined]
+        game_id = self.game_id  # pyright: ignore[reportAttributeAccessIssue]
+        return f"Manche {self.number} - partie {game_id}"
+
+
+# Compatibilite avec l'ancien nom utilise par la migration initiale.
+GameCard = DeckCard
+
+
+class MoveLog(models.Model):
+    """Journal chronologique des actions et événements d'une partie."""
+
+    class Action(models.TextChoices):
+        GAME_CREATED = "GAME_CREATED", "Partie creee"
+        PLAYER_JOINED = "PLAYER_JOINED", "Joueur arrive"
+        GAME_STARTED = "GAME_STARTED", "Partie demarree"
+        CARD_PLAYED = "CARD_PLAYED", "Carte ajoutee"
+        ROUND_RESOLVED = "ROUND_RESOLVED", "Manche resolue"
+        GAME_FINISHED = "GAME_FINISHED", "Partie terminee"
+
+    game = models.ForeignKey(
+        Game,
+        on_delete=models.CASCADE,
+        related_name="move_logs",
+    )
+    player = models.ForeignKey(
+        GamePlayer,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="move_logs",
+    )
+    round = models.ForeignKey(
+        Round,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="move_logs",
+    )
+    action = models.CharField(max_length=30, choices=Action.choices)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["game", "created_at"]),
+            models.Index(fields=["action"]),
+        ]
+
+    def __str__(self) -> str:
+        game_id = self.game_id  # pyright: ignore[reportAttributeAccessIssue]
+        return f"{self.get_action_display()} - partie {game_id}"  # pyright: ignore[reportAttributeAccessIssue]
