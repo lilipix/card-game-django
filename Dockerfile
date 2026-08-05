@@ -12,6 +12,8 @@ COPY pyproject.toml README.md ./
 COPY . /app
 
 RUN pip install --upgrade pip && pip install -e . && mkdir -p /home/app && chown -R app:app /home/app /app
+
+ENV HOME=/app
 USER app
 
 EXPOSE 8000

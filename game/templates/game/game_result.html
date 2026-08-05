@@ -1,0 +1,40 @@
+{% extends "game/base.html" %}
+
+{% block title %}Résultat — Partie #{{ game.id }}{% endblock %}
+
+{% block content %}
+<section class="game-result">
+    {% if outcome == "win" %}
+        <h1 class="game-result__title game-result__title--win">Victoire !</h1>
+    {% elif outcome == "loss" %}
+        <h1 class="game-result__title game-result__title--loss">Défaite</h1>
+    {% else %}
+        <h1 class="game-result__title game-result__title--draw">Match nul</h1>
+    {% endif %}
+
+    <div class="scoreboard scoreboard--final">
+        <div class="scoreboard__entry">
+            <span class="scoreboard__name">{{ current_player.user.username }} (vous)</span>
+            <span class="scoreboard__score">{{ current_player.score }}</span>
+        </div>
+        <div class="scoreboard__entry">
+            <span class="scoreboard__name">{{ opponent.user.username }}</span>
+            <span class="scoreboard__score">{{ opponent.score }}</span>
+        </div>
+    </div>
+
+    {% if game.winner %}
+        <p class="game-result__winner">Vainqueur : {{ game.winner.user.username }}</p>
+    {% else %}
+        <p class="game-result__winner">Aucun vainqueur, les deux joueurs sont à égalité.</p>
+    {% endif %}
+
+    <div class="game-result__actions">
+        <form method="post" action="{% url 'game:create' %}" class="inline-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Rejouer</button>
+        </form>
+        <a href="{% url 'game:home' %}" class="btn btn-secondary">Retour à l'accueil</a>
+    </div>
+</section>
+{% endblock %}

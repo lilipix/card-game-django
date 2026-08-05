@@ -1,0 +1,37 @@
+{% extends "game/base.html" %}
+
+{% block title %}La Bataille — Accueil{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>La Bataille</h1>
+    <p class="hero__lead">
+        Le grand classique du jeu de cartes, jouable en ligne à deux :
+        pas de stratégie à apprendre, juste le suspense de la carte retournée.
+    </p>
+
+    <div class="hero__actions">
+        {% if user.is_authenticated %}
+            <form method="post" action="{% url 'game:create' %}" class="inline-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Créer une partie</button>
+            </form>
+            <a href="{% url 'game:list' %}" class="btn btn-secondary">Rejoindre une partie</a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-primary">Se connecter pour jouer</a>
+            <a href="{% url 'game:signup' %}" class="btn btn-secondary">Créer un compte</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="rules">
+    <h2>Règles simplifiées</h2>
+    <ul>
+        <li>Le paquet de 52 cartes est partagé en deux mains égales, une par joueur.</li>
+        <li>À chaque manche, les deux joueurs retournent la carte du dessus de leur pioche.</li>
+        <li>La carte la plus forte remporte la manche (2 est la plus faible, l'As la plus forte, les enseignes ne comptent pas).</li>
+        <li>Chaque manche gagnée rapporte un point ; la partie se joue en 26 manches.</li>
+        <li>À la fin, le joueur avec le plus de points remporte la partie (ou match nul en cas d'égalité).</li>
+    </ul>
+</section>
+{% endblock %}

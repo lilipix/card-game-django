@@ -1,0 +1,41 @@
+{% extends "game/base.html" %}
+
+{% block title %}Salle d'attente — Partie #{{ game.id }}{% endblock %}
+
+{% block content %}
+<section class="waiting-room">
+    <h1>Salle d'attente — Partie #{{ game.id }}</h1>
+
+    <div class="waiting-room__slots">
+        <div class="waiting-room__slot">
+            <h2>Joueur 1</h2>
+            <p>{{ player_one.user.username|default:"—" }}</p>
+        </div>
+        <div class="waiting-room__slot {% if not player_two %}waiting-room__slot--empty{% endif %}">
+            <h2>Joueur 2</h2>
+            {% if player_two %}
+                <p>{{ player_two.user.username }}</p>
+            {% else %}
+                <p class="waiting-room__placeholder">Place libre</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not player_two %}
+        <p class="waiting-room__message">En attente d'un adversaire…</p>
+    {% elif is_player_one %}
+        <p class="waiting-room__message">Les deux joueurs sont prêts !</p>
+    {% else %}
+        <p class="waiting-room__message">En attente que {{ player_one.user.username }} lance la partie…</p>
+    {% endif %}
+
+    {% if is_player_one %}
+        <form method="post" action="{% url 'game:start' game.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary" {% if not can_start %}disabled{% endif %}>
+                Lancer la partie
+            </button>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}
