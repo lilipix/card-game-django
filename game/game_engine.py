@@ -1,3 +1,7 @@
+"""Moteur métier du jeu."""
+
+# pyright: reportMissingModuleSource=false
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import F
@@ -45,7 +49,7 @@ def _ensure_standard_cards() -> None:
         Card.objects.bulk_create(cards, ignore_conflicts=True)
 
 
-def _get_player(game: Game, user: User) -> GamePlayer:
+def _get_player(game: Game, user: User) -> GamePlayer:  # pyright: ignore[reportInvalidTypeForm]
     try:
         return GamePlayer.objects.select_related("user").get(game=game, user=user)
     except GamePlayer.DoesNotExist as exc:
@@ -66,9 +70,9 @@ def _get_current_round(game: Game) -> Round:
 
 
 def _next_expected_position(round_obj: Round) -> int:
-    if round_obj.player_one_card_id is None:
+    if round_obj.player_one_card_id is None:  # pyright: ignore[reportAttributeAccessIssue]
         return GamePlayer.Position.PLAYER_ONE
-    if round_obj.player_two_card_id is None:
+    if round_obj.player_two_card_id is None:  # pyright: ignore[reportAttributeAccessIssue]
         return GamePlayer.Position.PLAYER_TWO
     raise GameRuleError("La manche courante est déjà complète.", status_code=409)
 
@@ -296,7 +300,7 @@ def _finish_game(game: Game) -> None:
 
     game.status = Game.Status.FINISHED
     game.current_round = TOTAL_ROUNDS
-    game.winner = winner
+    game.winner = winner  # pyright: ignore[reportAttributeAccessIssue]
     game.finished_at = timezone.now()
     game.save(update_fields=["status", "current_round", "winner", "finished_at"])
 
