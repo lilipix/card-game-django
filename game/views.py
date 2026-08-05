@@ -2,12 +2,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
-from .game_engine import create_game, join_game, start_game
+from .game_engine import GameRuleError, create_game, join_game, play_card, start_game
 from .models import Game, GamePlayer
+from .serializers import serialize_game_for_user
 
 
 @login_required
@@ -39,7 +40,7 @@ def game_create(request: HttpRequest) -> HttpResponse:
 
     try:
         game = create_game(request.user)
-    except ValueError as error:
+    except GameRuleError as error:
         messages.error(request, str(error))
         return redirect("game:game_list")
 
@@ -81,6 +82,8 @@ def game_detail(
     context = {
         "game": game,
         "players": players,
+        # Etat initial déjà filtré selon le joueur connecté avant rendu HTML.
+        "game_state": serialize_game_for_user(game, request.user),
     }
 
     # Tant que le deuxième joueur n'est pas arrivé,
@@ -117,7 +120,7 @@ def game_join(
             join_game(game, request.user)
             started_game = start_game(game)
 
-    except ValueError as error:
+    except GameRuleError as error:
         messages.error(request, str(error))
         return redirect("game:game_list")
 
@@ -127,3 +130,43 @@ def game_join(
         "game:game_detail",
         game_id=started_game.pk,
     )
+
+
+@login_required
+@require_POST
+def game_play_card(
+    request: HttpRequest,
+    game_id: int,
+) -> JsonResponse:
+    """Reçoit uniquement l'intention du joueur d'ajouter une carte."""
+
+    game = get_object_or_404(Game, pk=game_id)
+
+    try:
+        # Le client n'envoie aucune carte: seul le moteur décide quoi jouer.
+        play_card(game, request.user)
+    except GameRuleError as error:
+        return JsonResponse({"error": str(error)}, status=error.status_code)
+
+    game.refresh_from_db()
+    return JsonResponse(serialize_game_for_user(game, request.user))
+
+
+@login_required
+@require_GET
+def game_state(
+    request: HttpRequest,
+    game_id: int,
+) -> JsonResponse:
+    """Renvoie l'état sérialisé de la partie visible par le joueur connecté."""
+
+    game = get_object_or_404(Game, pk=game_id)
+
+    # Le polling expose le même état filtré que le rendu HTML et les réponses POST.
+    if not GamePlayer.objects.filter(game=game, user=request.user).exists():
+        return JsonResponse(
+            {"error": "Vous ne participez pas à cette partie."},
+            status=403,
+        )
+
+    return JsonResponse(serialize_game_for_user(game, request.user))
