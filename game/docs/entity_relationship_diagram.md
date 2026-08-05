@@ -84,7 +84,7 @@ erDiagram
 
     USER ||--o| PROFILE : has
     USER ||--o{ GAMEPLAYER : participates
-    GAME ||--o{ GAMEPLAYER : contains
+    GAME ||--o| GAMEPLAYER : contains
     GAMEPLAYER o|--o{ GAME : wins
 
     GAME ||--|| DECK : has
@@ -93,12 +93,11 @@ erDiagram
     GAMEPLAYER ||--o{ DECKCARD : owns
 
     GAME ||--o{ ROUND : has
-    DECKCARD ||--o{ ROUND : player_one_card
+    DECKCARD o|--o{ ROUND : player_one_card
     DECKCARD ||--o{ ROUND : player_two_card
-    GAMEPLAYER ||--o{ ROUND : wins
+    GAMEPLAYER o|--o{ ROUND : wins
 
-    GAME ||--o{ MOVELOG : logs
+    GAME o|--o{ MOVELOG : logs
     GAMEPLAYER ||--o{ MOVELOG : actor
-    ROUND ||--o{ MOVELOG : references
+    ROUND o|--o{ MOVELOG : references
 ```
-
