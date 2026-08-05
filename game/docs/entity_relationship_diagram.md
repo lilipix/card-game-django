@@ -1,4 +1,4 @@
-
+```mermaid
 erDiagram
     direction TB
 
@@ -85,7 +85,7 @@ erDiagram
     USER ||--o| PROFILE : has
     USER ||--o{ GAMEPLAYER : participates
     GAME ||--o{ GAMEPLAYER : contains
-    GAMEPLAYER ||--o{ GAME : wins
+    GAMEPLAYER o|--o{ GAME : wins
 
     GAME ||--|| DECK : has
     DECK ||--o{ DECKCARD : contains
@@ -100,3 +100,5 @@ erDiagram
     GAME ||--o{ MOVELOG : logs
     GAMEPLAYER ||--o{ MOVELOG : actor
     ROUND ||--o{ MOVELOG : references
+```
+
