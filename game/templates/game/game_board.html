@@ -5,9 +5,12 @@
 {% block content %}
 <section class="game-table">
     <header class="game-table__header">
-        <p class="game-table__round">Manche {{ current_round.number }} sur 26</p>
+        <div>
+            <p class="section-label section-label--light">Duel en cours</p>
+            <p class="game-table__round">Manche {{ current_round.number }} sur 26</p>
+        </div>
         <div class="scoreboard">
-            <div class="scoreboard__entry">
+            <div class="scoreboard__entry scoreboard__entry--you">
                 <span class="scoreboard__name">{{ current_player.user.username }} (vous)</span>
                 <span class="scoreboard__score">{{ current_player.score }}</span>
             </div>

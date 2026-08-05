@@ -3,8 +3,14 @@
 {% block title %}Parties disponibles{% endblock %}
 
 {% block content %}
-<section class="game-list">
-    <h1>Parties</h1>
+<section class="game-list game-list--premium">
+    <div class="section-heading">
+        <div>
+            <p class="section-label">Tables ouvertes</p>
+            <h1>Choisis ta table</h1>
+        </div>
+        <div class="luxury-pill">Des duels rapides et élégants</div>
+    </div>
 
     {% if not games %}
         <p class="empty-state">Aucune partie pour le moment. Créez-en une depuis l'accueil !</p>
@@ -12,7 +18,7 @@
 
     <div class="game-list__grid">
         {% for game in games %}
-            <article class="game-card">
+            <article class="game-card game-card--premium">
                 <header class="game-card__header">
                     <h2>Partie #{{ game.id }}</h2>
                     {% if game.status == "WAITING" %}
