@@ -262,7 +262,7 @@ def _resolve_round(game: Game, round_obj: Round) -> None:
 
     if winner is not None:
         GamePlayer.objects.filter(pk=winner.pk).update(score=F("score") + 1)
-        winner.refresh_from_db()
+        winner = GamePlayer.objects.get(pk=winner.pk)
 
     round_obj.winner = winner
     round_obj.is_resolved = True
