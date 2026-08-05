@@ -1,236 +1,203 @@
-﻿from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import UserCreationForm
+from django.db import transaction
+from django.db.models import Count
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
-from django.views.decorators.http import require_POST
-from django.views.generic import CreateView
+from django.views.decorators.http import require_GET, require_POST
 
-from . import game_engine
+from .game_engine import GameRuleError, create_game, join_game, play_card, start_game
 from .models import Game, GamePlayer
-
-
-class SignUpView(CreateView):
-    """Inscription : Django gère déjà l'authentification, on ne construit que le formulaire."""
-
-    form_class = UserCreationForm
-    template_name = "registration/signup.html"
-    success_url = reverse_lazy("game:home")
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        login(self.request, self.object)
-        return response
-
-
-def home(request):
-    return render(request, "game/home.html")
+from .serializers import serialize_game_for_user
 
 
 @login_required
-def game_list(request):
-    games = list(
-        Game.objects.all().prefetch_related("players__user").order_by("-created_at")
+def game_list(request: HttpRequest) -> HttpResponse:
+    """Affiche les parties en attente qui peuvent être rejointes."""
+
+    # On affiche uniquement les parties en attente avec une place disponible,
+    # et on retire celles auxquelles l'utilisateur participe déjà.
+    available_games = (
+        Game.objects.filter(status=Game.Status.WAITING)
+        # Compte les participants de chaque partie.
+        .annotate(players_count=Count("players"))
+        # Une partie disponible doit contenir uniquement son créateur.
+        .filter(players_count=1)
+        # L'utilisateur ne doit pas déjà participer à la partie.
+        .exclude(players__user=request.user)
+        .order_by("-created_at")
     )
-    for game in games:
-        game.player_count = game.players.count()
-        game.already_joined = any(p.user_id == request.user.id for p in game.players.all())
-        game.is_joinable = (
-            game.status == Game.Status.WAITING
-            and not game.already_joined
-            and game.player_count < 2
-        )
-
-    return render(request, "game/game_list.html", {"games": games})
-
-
-@login_required
-@require_POST
-def create_game(request):
-    game = Game.objects.create()
-    GamePlayer.objects.create(
-        game=game,
-        user=request.user,
-        position=GamePlayer.Position.PLAYER_ONE,
-    )
-    return redirect("game:waiting_room", pk=game.pk)
-
-
-@login_required
-@require_POST
-def game_create(request):
-    return create_game(request)
-
-
-@login_required
-@require_POST
-def join_game(request, pk):
-    game = get_object_or_404(Game, pk=pk)
-
-    if game.players.filter(user=request.user).exists():
-        return redirect("game:waiting_room", pk=game.pk)
-
-    if game.status != Game.Status.WAITING or game.players.count() >= 2:
-        messages.error(request, "Cette partie n'est plus disponible.")
-        return redirect("game:list")
-
-    GamePlayer.objects.create(
-        game=game,
-        user=request.user,
-        position=GamePlayer.Position.PLAYER_TWO,
-    )
-    return redirect("game:waiting_room", pk=game.pk)
-
-
-@login_required
-@require_POST
-def game_join(request, game_id):
-    return join_game(request, game_id)
-
-
-@login_required
-def waiting_room(request, pk):
-    game = get_object_or_404(Game, pk=pk, players__user=request.user)
-
-    if game.status == Game.Status.IN_PROGRESS:
-        return redirect("game:board", pk=game.pk)
-    if game.status == Game.Status.FINISHED:
-        return redirect("game:result", pk=game.pk)
-
-    player_one = game.players.filter(position=GamePlayer.Position.PLAYER_ONE).first()
-    player_two = game.players.filter(position=GamePlayer.Position.PLAYER_TWO).first()
-    is_player_one = bool(player_one and player_one.user_id == request.user.id)
 
     return render(
         request,
-        "game/waiting_room.html",
+        "game/game_list.html",
+        {"available_games": available_games},
+    )
+
+
+@login_required
+def my_games(request: HttpRequest) -> JsonResponse:
+    """Liste les parties auxquelles participe l'utilisateur connecté."""
+
+    games = (
+        Game.objects.filter(players__user=request.user)
+        .select_related("winner")
+        .distinct()
+        .order_by("-created_at")
+    )
+
+    # Chaque partie est sérialisée avec les mêmes règles de visibilité que le plateau.
+    return JsonResponse(
         {
-            "game": game,
-            "player_one": player_one,
-            "player_two": player_two,
-            "is_player_one": is_player_one,
-            "can_start": is_player_one and player_two is not None,
-        },
+            "games": [
+                serialize_game_for_user(game, request.user)
+                for game in games
+            ],
+        }
     )
 
 
 @login_required
 @require_POST
-def start_game(request, pk):
-    game = get_object_or_404(Game, pk=pk, players__user=request.user)
-    player_one = game.players.filter(position=GamePlayer.Position.PLAYER_ONE).first()
+def game_create(request: HttpRequest) -> HttpResponse:
+    """Crée une partie avec l'utilisateur connecté comme joueur 1."""
 
-    if game.status != Game.Status.WAITING:
-        return redirect("game:board", pk=game.pk)
-    if player_one is None or player_one.user_id != request.user.id:
-        messages.error(request, "Seul le créateur de la partie peut la lancer.")
-        return redirect("game:waiting_room", pk=game.pk)
-    if game.players.count() < 2:
-        messages.error(request, "Il manque un second joueur.")
-        return redirect("game:waiting_room", pk=game.pk)
+    # Le moteur contient les règles métier ; la vue se limite à gérer
+    # la requête HTTP, les messages utilisateur et la redirection.
+    try:
+        game = create_game(request.user)
+    except GameRuleError as error:
+        messages.error(request, str(error))
+        return redirect("game:game_list")
 
-    game_engine.start_game(game)
-    return redirect("game:board", pk=game.pk)
+    messages.success(
+        request,
+        "La partie a été créée. En attente d'un adversaire.",
+    )
+
+    return redirect("game:game_detail", game_id=game.pk)
 
 
 @login_required
-def game_detail(request, game_id):
-    game = get_object_or_404(Game, pk=game_id, players__user=request.user)
+def game_detail(
+    request: HttpRequest,
+    game_id: int,
+) -> HttpResponse:
+    """Affiche la salle d'attente ou le plateau de jeu."""
 
-    if game.status == Game.Status.WAITING:
-        return redirect("game:waiting_room", pk=game.pk)
-    if game.status == Game.Status.IN_PROGRESS:
-        return redirect("game:board", pk=game.pk)
-    return redirect("game:result", pk=game.pk)
-
-
-@login_required
-def game_board(request, pk):
-    game = get_object_or_404(Game, pk=pk, players__user=request.user)
-
-    if game.status == Game.Status.WAITING:
-        return redirect("game:waiting_room", pk=game.pk)
-    if game.status == Game.Status.FINISHED:
-        return redirect("game:result", pk=game.pk)
-
-    current_player = game.players.get(user=request.user)
-    opponent = game.players.exclude(user=request.user).first()
-    current_round = game.rounds.filter(number=game.current_round).first()
-
-    if current_round is None:
-        return redirect("game:waiting_room", pk=game.pk)
-
-    my_field = (
-        "player_one_card"
-        if current_player.position == GamePlayer.Position.PLAYER_ONE
-        else "player_two_card"
-    )
-    opp_field = (
-        "player_two_card"
-        if current_player.position == GamePlayer.Position.PLAYER_ONE
-        else "player_one_card"
+    # On charge le gagnant avec la partie pour éviter une requête
+    # supplémentaire si la partie est terminée.
+    game = get_object_or_404(
+        Game.objects.select_related(
+            "winner",
+            "winner__user",
+        ),
+        pk=game_id,
     )
 
-    my_card = getattr(current_round, my_field)
-    opponent_card = getattr(current_round, opp_field)
-    last_round = game.rounds.filter(is_resolved=True).order_by("-number").first()
+    # Empêche une personne extérieure de consulter une partie.
+    if not GamePlayer.objects.filter(
+        game=game,
+        user=request.user,
+    ).exists():
+        return HttpResponseForbidden("Vous ne participez pas à cette partie.")
+
+    players = (
+        GamePlayer.objects.filter(
+            game=game,
+        )
+        .select_related("user")
+        .order_by("position")
+    )
 
     context = {
         "game": game,
-        "current_round": current_round,
-        "current_player": current_player,
-        "opponent": opponent,
-        "can_play": my_card is None,
-        "waiting_for_opponent": my_card is not None and not current_round.is_resolved,
-        "displayed_player_card": my_card,
-        "displayed_opponent_card": opponent_card if current_round.is_resolved else None,
-        "last_round": last_round,
+        "players": players,
+        # Etat initial déjà filtré selon le joueur connecté avant rendu HTML.
+        "game_state": serialize_game_for_user(game, request.user),
     }
-    return render(request, "game/game_board.html", context)
+
+    # Tant que le deuxième joueur n'est pas arrivé,
+    # le créateur voit la salle d'attente.
+    if game.status == Game.Status.WAITING:
+        return render(
+            request,
+            "game/waiting_room.html",
+            context,
+        )
+
+    # Une fois la partie démarrée, on affiche le plateau.
+    return render(
+        request,
+        "game/game_board.html",
+        context,
+    )
 
 
 @login_required
 @require_POST
-def play_card(request, pk):
-    game = get_object_or_404(Game, pk=pk, players__user=request.user)
-    current_player = game.players.get(user=request.user)
+def game_join(
+    request: HttpRequest,
+    game_id: int,
+) -> HttpResponse:
+    """Ajoute l'utilisateur comme joueur 2 et démarre la partie."""
+
+    game = get_object_or_404(Game, pk=game_id)
 
     try:
-        game_engine.play_card(game, current_player)
-    except ValueError as exc:
-        messages.error(request, str(exc))
+        # Si le démarrage échoue, l'inscription du joueur 2
+        # est également annulée grâce à la transaction globale.
+        with transaction.atomic():
+            join_game(game, request.user)
+            started_game = start_game(game)
 
-    if game.status == Game.Status.FINISHED:
-        return redirect("game:result", pk=game.pk)
-    return redirect("game:board", pk=game.pk)
+    except GameRuleError as error:
+        messages.error(request, str(error))
+        return redirect("game:game_list")
+
+    messages.success(request, "La partie commence !")
+
+    return redirect(
+        "game:game_detail",
+        game_id=started_game.pk,
+    )
 
 
 @login_required
-def game_result(request, pk):
-    game = get_object_or_404(
-        Game,
-        pk=pk,
-        players__user=request.user,
-        status=Game.Status.FINISHED,
-    )
-    current_player = game.players.get(user=request.user)
-    opponent = game.players.exclude(user=request.user).first()
+@require_POST
+def game_play_card(
+    request: HttpRequest,
+    game_id: int,
+) -> JsonResponse:
+    """Reçoit uniquement l'intention du joueur d'ajouter une carte."""
 
-    if game.winner_id is None:
-        outcome = "draw"
-    elif game.winner_id == current_player.pk:
-        outcome = "win"
-    else:
-        outcome = "loss"
+    game = get_object_or_404(Game, pk=game_id)
 
-    return render(
-        request,
-        "game/game_result.html",
-        {
-            "game": game,
-            "current_player": current_player,
-            "opponent": opponent,
-            "outcome": outcome,
-        },
-    )
+    try:
+        # Le client n'envoie aucune carte: seul le moteur décide quoi jouer.
+        play_card(game, request.user)
+    except GameRuleError as error:
+        return JsonResponse({"error": str(error)}, status=error.status_code)
+
+    game.refresh_from_db()
+    return JsonResponse(serialize_game_for_user(game, request.user))
+
+
+@login_required
+@require_GET
+def game_state(
+    request: HttpRequest,
+    game_id: int,
+) -> JsonResponse:
+    """Renvoie l'état sérialisé de la partie visible par le joueur connecté."""
+
+    game = get_object_or_404(Game, pk=game_id)
+
+    # Le polling expose le même état filtré que le rendu HTML et les réponses POST.
+    if not GamePlayer.objects.filter(game=game, user=request.user).exists():
+        return JsonResponse(
+            {"error": "Vous ne participez pas à cette partie."},
+            status=403,
+        )
+
+    return JsonResponse(serialize_game_for_user(game, request.user))

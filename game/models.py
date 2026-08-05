@@ -109,14 +109,9 @@ class GamePlayer(models.Model):
             ),
         ]
 
-    @property
-    def remaining_cards_count(self) -> int:
-        """Retourne le nombre de cartes non jouées restantes dans la pioche du joueur."""
-        return self.deck_cards.filter(is_played=False).count()
-
     def __str__(self) -> str:
         game_id = self.game_id  # pyright: ignore[reportAttributeAccessIssue]
-        return f"{self.user.username} — partie {game_id} — {self.get_position_display()}"  # pyright: ignore[reportAttributeAccessIssue]
+        return f"{self.user} - partie {game_id} - {self.get_position_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class Card(models.Model):

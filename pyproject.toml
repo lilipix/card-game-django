@@ -12,7 +12,6 @@ dependencies = [
     "django-environ>=0.14.0",
     "psycopg[binary]>=3.3.4",
     "gunicorn>=23.0.0",
-    "whitenoise>=6.7.0",
     "ruff>=0.6.0",
 ]
 
