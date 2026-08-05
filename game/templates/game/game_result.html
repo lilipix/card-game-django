@@ -3,8 +3,7 @@
 {% block title %}Résultat — Partie #{{ game.id }}{% endblock %}
 
 {% block content %}
-<section class="game-result game-result--celebration">
-    <p class="section-label">Fin de partie</p>
+<section class="game-result">
     {% if outcome == "win" %}
         <h1 class="game-result__title game-result__title--win">Victoire !</h1>
     {% elif outcome == "loss" %}

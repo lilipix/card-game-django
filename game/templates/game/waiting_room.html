@@ -3,17 +3,11 @@
 {% block title %}Salle d'attente — Partie #{{ game.id }}{% endblock %}
 
 {% block content %}
-<section class="waiting-room waiting-room--premium">
-    <div class="section-heading">
-        <div>
-            <p class="section-label">Préparez-vous</p>
-            <h1>Salle d'attente — Partie #{{ game.id }}</h1>
-        </div>
-        <div class="luxury-pill">Le duel commence bientôt</div>
-    </div>
+<section class="waiting-room">
+    <h1>Salle d'attente — Partie #{{ game.id }}</h1>
 
     <div class="waiting-room__slots">
-        <div class="waiting-room__slot waiting-room__slot--active">
+        <div class="waiting-room__slot">
             <h2>Joueur 1</h2>
             <p>{{ player_one.user.username|default:"—" }}</p>
         </div>

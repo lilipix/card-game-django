@@ -3,42 +3,12 @@
 {% block title %}La Bataille — Accueil{% endblock %}
 
 {% block content %}
-<section class="hero hero--premium">
-    <div class="hero__glow" aria-hidden="true"></div>
-    <p class="section-label">Casino de cartes • Duel en ligne</p>
+<section class="hero">
     <h1>La Bataille</h1>
     <p class="hero__lead">
-        Le grand classique du jeu de cartes, revisité comme un véritable duel de luxe.
-        Deux joueurs, une seule carte à la fois, et tout le suspense d’un retournement de destin.
+        Le grand classique du jeu de cartes, jouable en ligne à deux :
+        pas de stratégie à apprendre, juste le suspense de la carte retournée.
     </p>
-
-    <div class="hero__fan" aria-hidden="true">
-        <div class="card-unit card-unit--revealed card-unit--red">
-            <span class="card-unit__corner card-unit__corner--top"><span class="card-unit__rank">A</span><span class="card-unit__pip">♥</span></span>
-            <span class="card-unit__watermark">♥</span>
-            <span class="card-unit__corner card-unit__corner--bottom"><span class="card-unit__rank">A</span><span class="card-unit__pip">♥</span></span>
-        </div>
-        <div class="card-unit card-unit--revealed card-unit--black">
-            <span class="card-unit__corner card-unit__corner--top"><span class="card-unit__rank">K</span><span class="card-unit__pip">♠</span></span>
-            <span class="card-unit__watermark">♠</span>
-            <span class="card-unit__corner card-unit__corner--bottom"><span class="card-unit__rank">K</span><span class="card-unit__pip">♠</span></span>
-        </div>
-        <div class="card-unit card-unit--revealed card-unit--red">
-            <span class="card-unit__corner card-unit__corner--top"><span class="card-unit__rank">Q</span><span class="card-unit__pip">♦</span></span>
-            <span class="card-unit__watermark">♦</span>
-            <span class="card-unit__corner card-unit__corner--bottom"><span class="card-unit__rank">Q</span><span class="card-unit__pip">♦</span></span>
-        </div>
-        <div class="card-unit card-unit--revealed card-unit--black">
-            <span class="card-unit__corner card-unit__corner--top"><span class="card-unit__rank">J</span><span class="card-unit__pip">♣</span></span>
-            <span class="card-unit__watermark">♣</span>
-            <span class="card-unit__corner card-unit__corner--bottom"><span class="card-unit__rank">J</span><span class="card-unit__pip">♣</span></span>
-        </div>
-        <div class="card-unit card-unit--revealed card-unit--red">
-            <span class="card-unit__corner card-unit__corner--top"><span class="card-unit__rank">10</span><span class="card-unit__pip">♥</span></span>
-            <span class="card-unit__watermark">♥</span>
-            <span class="card-unit__corner card-unit__corner--bottom"><span class="card-unit__rank">10</span><span class="card-unit__pip">♥</span></span>
-        </div>
-    </div>
 
     <div class="hero__actions">
         {% if user.is_authenticated %}
@@ -52,48 +22,16 @@
             <a href="{% url 'game:signup' %}" class="btn btn-secondary">Créer un compte</a>
         {% endif %}
     </div>
-
-    <div class="hero__stats">
-        <div class="hero__stat">
-            <strong>2</strong>
-            <span>joueurs</span>
-        </div>
-        <div class="hero__stat">
-            <strong>26</strong>
-            <span>manches</span>
-        </div>
-        <div class="hero__stat">
-            <strong>100%</strong>
-            <span>drama</span>
-        </div>
-    </div>
 </section>
 
-<section class="rules rules--split">
-    <div class="rules__content">
-        <h2>Règles simplifiées</h2>
-        <ul>
-            <li>Le paquet de 52 cartes est partagé en deux mains égales, une par joueur.</li>
-            <li>À chaque manche, les deux joueurs retournent la carte du dessus de leur pioche.</li>
-            <li>La carte la plus forte remporte la manche (2 est la plus faible, l'As la plus forte, les enseignes ne comptent pas).</li>
-            <li>Chaque manche gagnée rapporte un point ; la partie se joue en 26 manches.</li>
-            <li>À la fin, le joueur avec le plus de points remporte la partie (ou match nul en cas d'égalité).</li>
-        </ul>
-    </div>
-
-    <div class="feature-list">
-        <article class="feature-card">
-            <h3>⚡ Instantané</h3>
-            <p>Une partie se lance rapidement et le suspense démarre immédiatement.</p>
-        </article>
-        <article class="feature-card">
-            <h3>🎲 Immersif</h3>
-            <p>Le plateau affiche chaque tour avec une ambiance visuelle de salon de jeu.</p>
-        </article>
-        <article class="feature-card">
-            <h3>✨ Épuré</h3>
-            <p>Le design mêle élégance, couleurs chaudes et effets de profondeur.</p>
-        </article>
-    </div>
+<section class="rules">
+    <h2>Règles simplifiées</h2>
+    <ul>
+        <li>Le paquet de 52 cartes est partagé en deux mains égales, une par joueur.</li>
+        <li>À chaque manche, les deux joueurs retournent la carte du dessus de leur pioche.</li>
+        <li>La carte la plus forte remporte la manche (2 est la plus faible, l'As la plus forte, les enseignes ne comptent pas).</li>
+        <li>Chaque manche gagnée rapporte un point ; la partie se joue en 26 manches.</li>
+        <li>À la fin, le joueur avec le plus de points remporte la partie (ou match nul en cas d'égalité).</li>
+    </ul>
 </section>
 {% endblock %}
