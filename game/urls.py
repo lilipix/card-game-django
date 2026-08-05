@@ -17,6 +17,12 @@ urlpatterns = [
         views.game_create,
         name="game_create",
     ),
+    # Liste JSON des parties du joueur connecté.
+    path(
+        "mine/",
+        views.my_games,
+        name="my_games",
+    ),
     # Affichage HTML de la salle d'attente ou du plateau de jeu.
     path(
         "<int:game_id>/",

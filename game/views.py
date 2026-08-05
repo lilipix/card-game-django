@@ -15,6 +15,8 @@ from .serializers import serialize_game_for_user
 def game_list(request: HttpRequest) -> HttpResponse:
     """Affiche les parties en attente qui peuvent être rejointes."""
 
+    # On affiche uniquement les parties en attente avec une place disponible,
+    # et on retire celles auxquelles l'utilisateur participe déjà.
     available_games = (
         Game.objects.filter(status=Game.Status.WAITING)
         # Compte les participants de chaque partie.
@@ -34,10 +36,34 @@ def game_list(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def my_games(request: HttpRequest) -> JsonResponse:
+    """Liste les parties auxquelles participe l'utilisateur connecté."""
+
+    games = (
+        Game.objects.filter(players__user=request.user)
+        .select_related("winner")
+        .distinct()
+        .order_by("-created_at")
+    )
+
+    # Chaque partie est sérialisée avec les mêmes règles de visibilité que le plateau.
+    return JsonResponse(
+        {
+            "games": [
+                serialize_game_for_user(game, request.user)
+                for game in games
+            ],
+        }
+    )
+
+
+@login_required
 @require_POST
 def game_create(request: HttpRequest) -> HttpResponse:
     """Crée une partie avec l'utilisateur connecté comme joueur 1."""
 
+    # Le moteur contient les règles métier ; la vue se limite à gérer
+    # la requête HTTP, les messages utilisateur et la redirection.
     try:
         game = create_game(request.user)
     except GameRuleError as error:
@@ -59,8 +85,13 @@ def game_detail(
 ) -> HttpResponse:
     """Affiche la salle d'attente ou le plateau de jeu."""
 
+    # On charge le gagnant avec la partie pour éviter une requête
+    # supplémentaire si la partie est terminée.
     game = get_object_or_404(
-        Game.objects.select_related("winner"),
+        Game.objects.select_related(
+            "winner",
+            "winner__user",
+        ),
         pk=game_id,
     )
 
