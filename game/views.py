@@ -49,10 +49,7 @@ def my_games(request: HttpRequest) -> JsonResponse:
     # Chaque partie est sérialisée avec les mêmes règles de visibilité que le plateau.
     return JsonResponse(
         {
-            "games": [
-                serialize_game_for_user(game, request.user)
-                for game in games
-            ],
+            "games": [serialize_game_for_user(game, request.user) for game in games],
         }
     )
 
