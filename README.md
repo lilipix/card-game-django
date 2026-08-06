@@ -56,6 +56,26 @@ git clone https://github.com/lilipix/card-game-django/
 cd card-game-django
 ```
 
+### Workflow Git recommandé
+
+Pour éviter les conflits sur la branche principale, le flux conseillé est :
+
+```bash
+git switch main
+git pull origin main
+git switch -c feature/ma-fonctionnalite
+```
+
+Pendant le développement :
+
+```bash
+git add .
+git commit -m "feat: description courte du changement"
+git push -u origin feature/ma-fonctionnalite
+```
+
+Ensuite, ouvrir une Pull Request vers `main` plutôt que pousser directement sur `main`.
+
 ### Configuration des variables d’environnement
 
 Créer le fichier d’environnement à partir de l’exemple :
@@ -439,17 +459,18 @@ Une difficulté a été rencontrée lorsque PostgreSQL local et PostgreSQL lanc�
 - validation des règles métier côté serveur ;
 - utilisation de contraintes de base de données ;
 - protection des opérations sensibles avec des transactions ;
-- environnement reproductible grâce à Docker Compose.
+- environnement reproductible grâce à Docker Compose ;
+- synchronisation automatique de l'interface de jeu entre joueurs via polling HTTP.
 
 
 ### Limites actuelles
 
-- il n’existe pas de communication en temps réel entre les navigateurs ;
-- l’interface peut nécessiter un rafraîchissement pour afficher une action effectuée par l’autre joueur ;
+- la synchronisation repose sur du polling HTTP (et non sur un canal push temps réel) ;
+- selon le navigateur et l'état de l'onglet (arrière-plan), un léger délai d'actualisation peut apparaître.
 
 ### Améliorations possibles
 
-- ajouter des mises à jour en temps réel avec Django Channels et WebSocket ;
+- remplacer le polling par une synchronisation push avec Django Channels et WebSocket ;
 - permettre de rejouer une partie;
 - proposer de jouers à plus de 2 joueurs.
 

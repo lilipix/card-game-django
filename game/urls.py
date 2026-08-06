@@ -5,6 +5,7 @@ from . import views
 app_name = "game"
 
 urlpatterns = [
+    path("home/", views.home, name="home"),
     # Liste des parties en attente accessibles au joueur connecté.
     path(
         "",
@@ -47,4 +48,10 @@ urlpatterns = [
         views.game_state,
         name="game_state",
     ),
+    path(
+        "<int:game_id>/result/",
+        views.game_result,
+        name="game_result",
+    ),
+    path("signup/", views.SignUpView.as_view(), name="signup"),
 ]
