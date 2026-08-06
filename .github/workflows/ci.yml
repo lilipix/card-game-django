@@ -10,17 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Récupération du code source
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Configuration de Python pour le Linting (Ruff)
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # 3. Installation et vérification du style (PEP8)
       - name: Install Linter
         run: |
           python -m pip install --upgrade pip
@@ -29,11 +26,13 @@ jobs:
       - name: Run Linter (Ruff)
         run: ruff check .
 
-      # 4. Exécution des tests Django dans l'environnement Docker
+      # NOUVEAU : Création d'un fichier .env vide pour Docker Compose
+      - name: Create dummy .env file for Docker
+        run: touch .env
+
       - name: Run Django Tests in Docker Compose
         run: docker compose run --rm web python manage.py test
 
-      # 5. Nettoyage des conteneurs et volumes temporaires
       - name: Clean up Docker resources
         if: always()
         run: docker compose down -v --remove-orphans

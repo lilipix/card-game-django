@@ -9,6 +9,8 @@ from game.game_engine import (
     join_game,
     play_card,
     start_game,
+)
+from game.game_engine import (
     _resolve_round as resolve_round,
 )
 from game.models import Game, GameCard, GamePlayer, Round
@@ -100,7 +102,7 @@ class CreateGameTests(TestCase):
         p2 = GamePlayer.objects.get(game=game, position=GamePlayer.Position.PLAYER_TWO)
 
         # Joueur 1 joue une carte (play_card retourne l'objet Round)
-        round_obj = play_card(game, p1.user)
+        play_card(game, p1.user)
         current_round = Round.objects.get(game=game, number=1)
 
         self.assertIsNotNone(current_round.player_one_card)
