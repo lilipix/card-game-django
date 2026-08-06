@@ -175,7 +175,6 @@ def game_detail(
     my_card = current_round.card_for(current_player)
     opponent_card = current_round.card_for(opponent) if opponent is not None else None
     player_one_has_card = current_round.player_one_card_id is not None
-    player_two_has_card = current_round.player_two_card_id is not None
     expected_position = (
         GamePlayer.Position.PLAYER_TWO
         if player_one_has_card
@@ -294,7 +293,11 @@ def game_result(
         status=Game.Status.FINISHED,
     )
 
-    current_player = get_object_or_404(GamePlayer.objects.select_related("user"), game=game, user=request.user)
+    current_player = get_object_or_404(
+        GamePlayer.objects.select_related("user"),
+        game=game,
+        user=request.user,
+    )
     opponent = (
         GamePlayer.objects.select_related("user")
         .filter(game=game)
