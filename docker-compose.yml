@@ -28,6 +28,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
       REDIS_URL: redis://cache:6379/1
+      REDIS_HOST: cache
+      REDIS_PORT: 6379
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
