@@ -21,16 +21,17 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-cardgame}
-      POSTGRES_USER: ${POSTGRES_USER:-cardgame}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardgame}
+      POSTGRES_DB: ${POSTGRES_DB:-cardgame_db}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-cardgame} -d ${POSTGRES_DB:-cardgame}",
+          "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-cardgame_db}",
         ]
       interval: 10s
       timeout: 5s
