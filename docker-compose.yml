@@ -21,10 +21,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-cardgame_db}
       POSTGRES_USER: ${POSTGRES_USER:-root}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
+      REDIS_URL: redis://cache:6379/1
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
