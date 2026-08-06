@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from .game_cache import invalidate_game_state
 from .models import Card, Deck, DeckCard, Game, GamePlayer, MoveLog, Profile, Round
 
 User = get_user_model()
@@ -61,10 +62,7 @@ def _get_player(game: Game, user: User) -> GamePlayer:  # pyright: ignore[report
 
 def _get_current_round(game: Game) -> Round:
     try:
-        return (
-            Round.objects.select_for_update()
-            .get(game=game, number=game.current_round)
-        )
+        return Round.objects.select_for_update().get(game=game, number=game.current_round)
     except Round.DoesNotExist as exc:
         raise GameRuleError("La manche courante est introuvable.") from exc
 
@@ -136,6 +134,10 @@ def join_game(game: Game, user) -> GamePlayer:
     )
     Profile.objects.get_or_create(user=user)
     _log(locked_game, MoveLog.Action.PLAYER_JOINED, player=player)
+
+    # supprime la salle d'attente mise en cache
+    transaction.on_commit(lambda: invalidate_game_state(locked_game.pk))
+
     return player
 
 
@@ -182,6 +184,10 @@ def start_game(game: Game) -> Game:
     locked_game.save(update_fields=["status", "current_round", "started_at"])
 
     _log(locked_game, MoveLog.Action.GAME_STARTED, round_obj=first_round)
+
+    # invalide le cache supprime Waiting
+    transaction.on_commit(lambda: invalidate_game_state(locked_game.pk))
+
     return locked_game
 
 
@@ -232,6 +238,9 @@ def play_card(game: Game, user) -> Round:
             round_obj=round_obj,
             details={"position": deck_card.position},
         )
+
+        transaction.on_commit(lambda: invalidate_game_state(locked_game.pk))
+
         return round_obj
 
     round_obj.player_two_card = deck_card
@@ -245,6 +254,8 @@ def play_card(game: Game, user) -> Round:
     )
 
     _resolve_round(locked_game, round_obj)
+
+    transaction.on_commit(lambda: invalidate_game_state(locked_game.pk))
     return round_obj
 
 

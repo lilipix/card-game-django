@@ -22,11 +22,7 @@ def _serialize_public_card_state(has_card: bool) -> dict:
 def serialize_game_for_user(game: Game, user) -> dict:
     """Expose l'état de partie visible par l'utilisateur connecté."""
 
-    players = list(
-        GamePlayer.objects.select_related("user")
-        .filter(game=game)
-        .order_by("position")
-    )
+    players = list(GamePlayer.objects.select_related("user").filter(game=game).order_by("position"))
     user_id = user.id  # pyright: ignore[reportAttributeAccessIssue]
     # Les attributs *_id sont ajoutés dynamiquement par l'ORM Django.
     current_player = next(
@@ -52,6 +48,7 @@ def serialize_game_for_user(game: Game, user) -> dict:
     )
 
     game_id = game.id  # pyright: ignore[reportAttributeAccessIssue]
+
     return {
         "id": game_id,
         "status": game.status,

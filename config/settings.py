@@ -109,6 +109,22 @@ DATABASES = {
     }
 }
 
+# cache REDIS
+
+REDIS_URL = env(
+    "REDIS_URL",
+    default="redis://localhost:6379/1",
+)
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+SESSION_CACHE_ALIAS = "default"
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
