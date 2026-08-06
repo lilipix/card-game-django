@@ -109,6 +109,10 @@ class GamePlayer(models.Model):
             ),
         ]
 
+    @property
+    def remaining_cards_count(self) -> int:
+        return self.deck_cards.filter(is_played=False).count()
+
     def __str__(self) -> str:
         game_id = self.game_id  # pyright: ignore[reportAttributeAccessIssue]
         return f"{self.user} - partie {game_id} - {self.get_position_display()}"  # pyright: ignore[reportAttributeAccessIssue]
