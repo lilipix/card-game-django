@@ -1,0 +1,76 @@
+{% extends "game/base.html" %}
+
+{% block title %}Parties disponibles{% endblock %}
+
+{% block content %}
+<section class="game-list game-list--premium">
+    <div class="section-heading">
+        <div>
+            <p class="section-label">Tables ouvertes</p>
+            <h1>Choisis ta table</h1>
+        </div>
+        <div class="luxury-pill">Des duels rapides et élégants</div>
+    </div>
+
+    <h2>Mes parties</h2>
+    {% if not user_games %}
+        <p class="empty-state">Tu ne participes à aucune partie pour le moment.</p>
+    {% endif %}
+
+    <div class="game-list__grid" style="margin-bottom: 1.5rem;">
+        {% for game in user_games %}
+            <article class="game-card game-card--premium">
+                <header class="game-card__header">
+                    <h2>Partie #{{ game.id }}</h2>
+                    {% if game.status == "WAITING" %}
+                        <span class="badge badge--waiting">En attente</span>
+                    {% elif game.status == "IN_PROGRESS" %}
+                        <span class="badge badge--progress">En cours</span>
+                    {% else %}
+                        <span class="badge badge--finished">Terminée</span>
+                    {% endif %}
+                </header>
+
+                <p class="game-card__players">{{ game.players_count }}/2 joueurs</p>
+
+                <footer class="game-card__actions">
+                    <a href="{% url 'game:game_detail' game.id %}" class="btn btn-secondary">Ouvrir</a>
+                </footer>
+            </article>
+        {% endfor %}
+    </div>
+
+    <h2>Parties disponibles</h2>
+
+    {% if not available_games %}
+        <p class="empty-state">Aucune partie disponible pour le moment.</p>
+    {% endif %}
+
+    <div class="game-result__actions" style="margin-bottom: 1rem; justify-content: flex-start;">
+        <form method="post" action="{% url 'game:game_create' %}" class="inline-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Créer une nouvelle partie</button>
+        </form>
+    </div>
+
+    <div class="game-list__grid">
+        {% for game in available_games %}
+            <article class="game-card game-card--premium">
+                <header class="game-card__header">
+                    <h2>Partie #{{ game.id }}</h2>
+                    <span class="badge badge--waiting">En attente</span>
+                </header>
+
+                <p class="game-card__players">1/2 joueurs</p>
+
+                <footer class="game-card__actions">
+                    <form method="post" action="{% url 'game:game_join' game.id %}" class="inline-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">Rejoindre</button>
+                    </form>
+                </footer>
+            </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

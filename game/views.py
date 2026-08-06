@@ -1,14 +1,33 @@
 from django.contrib import messages
+from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import UserCreationForm
 from django.db import transaction
 from django.db.models import Count
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
 from django.views.decorators.http import require_GET, require_POST
+from django.views.generic import CreateView
 
 from .game_engine import GameRuleError, create_game, join_game, play_card, start_game
 from .models import Game, GamePlayer
 from .serializers import serialize_game_for_user
+
+
+class SignUpView(CreateView):
+    form_class = UserCreationForm
+    template_name = "registration/signup.html"
+    success_url = reverse_lazy("game:game_list")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        login(self.request, self.object)
+        return response
+
+
+def home(request: HttpRequest) -> HttpResponse:
+    return render(request, "game/home.html")
 
 
 @login_required
@@ -28,10 +47,20 @@ def game_list(request: HttpRequest) -> HttpResponse:
         .order_by("-created_at")
     )
 
+    user_games = (
+        Game.objects.filter(players__user=request.user)
+        .annotate(players_count=Count("players"))
+        .distinct()
+        .order_by("-created_at")
+    )
+
     return render(
         request,
         "game/game_list.html",
-        {"available_games": available_games},
+        {
+            "available_games": available_games,
+            "user_games": user_games,
+        },
     )
 
 
@@ -107,9 +136,21 @@ def game_detail(
         .order_by("position")
     )
 
+    player_one = next((p for p in players if p.position == GamePlayer.Position.PLAYER_ONE), None)
+    player_two = next((p for p in players if p.position == GamePlayer.Position.PLAYER_TWO), None)
+    is_player_one = bool(player_one and player_one.user_id == request.user.id)
+    current_player = next((p for p in players if p.user_id == request.user.id), None)
+    opponent = next((p for p in players if p.user_id != request.user.id), None)
+
+    if current_player is None:
+        return HttpResponseForbidden("Vous ne participez pas à cette partie.")
+
     context = {
         "game": game,
         "players": players,
+        "player_one": player_one,
+        "player_two": player_two,
+        "is_player_one": is_player_one,
         # Etat initial déjà filtré selon le joueur connecté avant rendu HTML.
         "game_state": serialize_game_for_user(game, request.user),
     }
@@ -122,6 +163,43 @@ def game_detail(
             "game/waiting_room.html",
             context,
         )
+
+    if game.status == Game.Status.FINISHED:
+        return redirect("game:game_result", game_id=game.pk)
+
+    current_round = game.rounds.filter(number=game.current_round).first()
+    if current_round is None:
+        messages.error(request, "La manche en cours est introuvable.")
+        return render(request, "game/game_board.html", context)
+
+    my_card = current_round.card_for(current_player)
+    opponent_card = current_round.card_for(opponent) if opponent is not None else None
+    player_one_has_card = current_round.player_one_card_id is not None
+    player_two_has_card = current_round.player_two_card_id is not None
+    expected_position = (
+        GamePlayer.Position.PLAYER_TWO
+        if player_one_has_card
+        else GamePlayer.Position.PLAYER_ONE
+    )
+    can_play = (
+        not current_round.is_resolved
+        and my_card is None
+        and current_player.position == expected_position
+    )
+
+    last_round = game.rounds.filter(is_resolved=True).order_by("-number").first()
+    context.update(
+        {
+            "current_round": current_round,
+            "current_player": current_player,
+            "opponent": opponent,
+            "can_play": can_play,
+            "waiting_for_opponent": my_card is not None and not current_round.is_resolved,
+            "displayed_player_card": my_card,
+            "displayed_opponent_card": opponent_card if current_round.is_resolved else None,
+            "last_round": last_round,
+        }
+    )
 
     # Une fois la partie démarrée, on affiche le plateau.
     return render(
@@ -165,7 +243,7 @@ def game_join(
 def game_play_card(
     request: HttpRequest,
     game_id: int,
-) -> JsonResponse:
+) -> HttpResponse:
     """Reçoit uniquement l'intention du joueur d'ajouter une carte."""
 
     game = get_object_or_404(Game, pk=game_id)
@@ -174,10 +252,15 @@ def game_play_card(
         # Le client n'envoie aucune carte: seul le moteur décide quoi jouer.
         play_card(game, request.user)
     except GameRuleError as error:
-        return JsonResponse({"error": str(error)}, status=error.status_code)
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({"error": str(error)}, status=error.status_code)
+        messages.error(request, str(error))
+        return redirect("game:game_detail", game_id=game.pk)
 
     game.refresh_from_db()
-    return JsonResponse(serialize_game_for_user(game, request.user))
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse(serialize_game_for_user(game, request.user))
+    return redirect("game:game_detail", game_id=game.pk)
 
 
 @login_required
@@ -198,3 +281,41 @@ def game_state(
         )
 
     return JsonResponse(serialize_game_for_user(game, request.user))
+
+
+@login_required
+def game_result(
+    request: HttpRequest,
+    game_id: int,
+) -> HttpResponse:
+    game = get_object_or_404(
+        Game.objects.select_related("winner", "winner__user"),
+        pk=game_id,
+        status=Game.Status.FINISHED,
+    )
+
+    current_player = get_object_or_404(GamePlayer.objects.select_related("user"), game=game, user=request.user)
+    opponent = (
+        GamePlayer.objects.select_related("user")
+        .filter(game=game)
+        .exclude(user=request.user)
+        .first()
+    )
+
+    if game.winner_id is None:
+        outcome = "draw"
+    elif game.winner_id == current_player.id:
+        outcome = "win"
+    else:
+        outcome = "loss"
+
+    return render(
+        request,
+        "game/game_result.html",
+        {
+            "game": game,
+            "current_player": current_player,
+            "opponent": opponent,
+            "outcome": outcome,
+        },
+    )
