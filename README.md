@@ -33,10 +33,6 @@ Les valeurs des cartes sont comprises entre `2` et `14` :
 - `13` : Roi ;
 - `14` : As.
 
-### Capture d’écran de l’interface principale
-
-![Interface principale du jeu](game/static/game/picture/home.png)
-
 ## Guide de démarrage rapide
 
 ### Prérequis
