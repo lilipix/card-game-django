@@ -1,4 +1,4 @@
-# Bataille simplifiée - Jeu de cartes Django
+# Bataille - Jeu de cartes Django
 
 ## Membres du groupe
 
@@ -8,7 +8,7 @@
 
 ## Présentation du projet
 
-Ce projet est une application web permettant à deux utilisateurs de jouer à une version simplifiée de la Bataille.
+Ce projet est une application web permettant à deux utilisateurs de jouer à la Bataille.
 
 L’application est développée avec Django et utilise PostgreSQL pour la persistance des données. Elle peut être lancée entièrement avec Docker Compose.
 
@@ -138,6 +138,30 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py test
 ```
 
+## CI/CD et tests
+
+Le dépôt contient un workflow GitHub Actions : [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Le workflow s'exécute sur les événements `push` et `pull_request` et réalise notamment :
+
+- Checkout du code et configuration de Python 3.12.
+- Installation et exécution du linter `ruff` (`ruff check .`).
+- Génération d'un fichier `.env` minimal pour Docker Compose en CI.
+- Nettoyage des ressources Docker après l'exécution.
+
+Commandes utiles localement :
+
+```bash
+docker compose up --build -d
+docker compose exec web python manage.py test
+```
+
+Pour exécuter le linter localement :
+
+```bash
+pip install ruff
+ruff check 
+```
+
 ### Arrêt de l’application
 
 ```bash
@@ -154,6 +178,8 @@ Le projet suit l’architecture MVT de Django :
 - Game engine : applique les règles métier indépendamment de l’affichage.
 
 Le moteur de jeu est isolé dans game_engine.py. Les vues ne décident pas directement du gagnant d’une manche et ne modifient pas librement les scores. Elles transmettent les actions au moteur, qui contrôle les règles avant toute écriture en base de données.
+
+Séparation claire : `game_engine.py` contient toute la logique métier, tandis que les vues se limitent à l'orchestration des requêtes et à la présentation.
 
 Cette séparation permet notamment :
 
@@ -307,6 +333,7 @@ stateDiagram-v2
         [*] --> NoCard
     }
 ```
+
 Une manche est créée sans carte. La première action enregistre la carte du joueur 1. La seconde enregistre celle du joueur 2, compare les valeurs, attribue éventuellement un point et marque la manche comme résolue.
 
 ## Choix UI/UX et Design Tokens
@@ -355,7 +382,6 @@ Les atomes sont les éléments visuels les plus simples :
 - icônes ;
 - valeurs de score.
 
-
 #### Molécules
 
 Les molécules regroupent plusieurs atomes :
@@ -394,7 +420,6 @@ Les pages combinent un template avec les données envoyées par Django :
 - partie en cours ;
 - partie terminée ;
 - liste réelle des parties disponibles.
-
 
 ## Journal d’architecture
 
@@ -441,13 +466,12 @@ Pour les règles impliquant plusieurs modèles la solution a été de les défin
 
 #### Transactions
 
-Certaines actions du moteurs sont exécutées dans des transactions avec le décorateur `@transaction.atomic` . 
-Les objets concernés sont verrouillés avec `select_for_update()` afin d'éviter que deux requêtes simultanées rejoignent la même place ou jouent la même carte. 
+Certaines actions du moteurs sont exécutées dans des transactions avec le décorateur `@transaction.atomic` .
+Les objets concernés sont verrouillés avec `select_for_update()` afin d'éviter que deux requêtes simultanées rejoignent la même place ou jouent la même carte.
 
 #### Configuration PostgreSQL
 
 Une difficulté a été rencontrée lorsque PostgreSQL local et PostgreSQL lancé par Docker utilisaient des ports et des identifiants différents. La solution a été d'utiliser uniquement PostgreSQL dans docker.
-
 
 ## Auto-évaluation
 
@@ -459,7 +483,6 @@ Une difficulté a été rencontrée lorsque PostgreSQL local et PostgreSQL lanc�
 - protection des opérations sensibles avec des transactions ;
 - environnement reproductible grâce à Docker Compose ;
 - synchronisation automatique de l'interface de jeu entre joueurs via polling HTTP.
-
 
 ### Limites actuelles
 
